@@ -3,144 +3,347 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Giám Sát Ổ Cắm Điện Thông Minh</title>
+    <title>Hệ Thống Giám Sát ESP32</title>
     <!-- Thư viện Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Thư viện Firebase (Compat version) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
+    
     <style>
-        :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent-blue: #3b82f6;
-            --accent-orange: #f97316;
-            --safe-color: #10b981;
-            --danger-color: #ef4444;
+        /* === CẤU HÌNH PHÔNG CHỮ VÀ GIAO DIỆN CHÍNH === */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
-        
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #334155; }
-        .header h1 { font-size: 22px; font-weight: 600; }
-        
-        .btn-simulate { background-color: var(--accent-blue); color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn-simulate:hover { background-color: #2563eb; }
+        body {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            padding: 20px;
+        }
 
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        
-        .card { background-color: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); text-align: center; }
-        .card h3 { color: var(--text-muted); font-size: 14px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .card .value { font-size: 28px; font-weight: bold; }
-        
-        .val-temp { color: var(--accent-orange); }
-        .val-power { color: #a855f7; }
-        .val-volt { color: #eab308; }
-        .val-amp { color: #06b6d4; }
-        .status-on { color: var(--safe-color); }
-        .status-off { color: var(--danger-color); animation: blink 1s infinite alternate; }
+        /* Nút Mô Phỏng Góc Trên Trái */
+        .btn-top-left {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background-color: #f59e0b;
+            color: #ffffff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease;
+            z-index: 99;
+        }
 
-        @keyframes blink { from { opacity: 1; } to { opacity: 0.5; } }
+        .btn-top-left:hover {
+            background-color: #d97706;
+            transform: translateY(-2px);
+        }
 
-        .chart-container { background-color: var(--card-bg); padding: 20px; border-radius: 12px; height: 400px; width: 100%; }
+        /* Container Khung Dashboard */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding-top: 45px;
+        }
 
-        /* Modal CSS */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background-color: var(--card-bg); padding: 24px; border-radius: 12px; width: 90%; max-width: 400px; }
-        .modal-content h2 { margin-bottom: 16px; font-size: 18px; border-bottom: 1px solid #334155; padding-bottom: 8px; }
-        .form-group { margin-bottom: 12px; }
-        .form-group label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size: 14px; }
-        .form-group input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; outline: none; }
-        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-submit { flex: 1; background-color: var(--safe-color); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .btn-cancel { flex: 1; background-color: #475569; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        header h1 {
+            font-size: 26px;
+            color: #0284c7;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        /* Bố cục Grid 2 cột */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .card h2 {
+            font-size: 16px;
+            color: #334155;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 8px;
+        }
+
+        .chart-card {
+            grid-column: 1 / -1;
+        }
+
+        /* Hiển thị dữ liệu số */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat-item {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-item .label {
+            font-size: 12px;
+            color: #64748b;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .stat-item .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0284c7;
+        }
+
+        .stat-item .value.status-on {
+            color: #16a34a;
+        }
+
+        .stat-item .value.status-off {
+            color: #dc2626;
+        }
+
+        /* Khung tổng hợp 12h */
+        .summary-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .summary-item .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #16a34a;
+        }
+
+        .note {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        /* Biểu đồ */
+        .chart-container {
+            position: relative;
+            height: 320px;
+            width: 100%;
+        }
+
+        /* MODAL MÔ PHỎNG */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 23, 42, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 20px;
+            color: #64748b;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #334155;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 9px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .form-group input:focus {
+            border-color: #0284c7;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background-color: #0284c7;
+            color: #ffffff;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            background-color: #0369a1;
+        }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>📊 Dashboard Giám Sát Ổ Cắm (ESP32)</h1>
-        <button class="btn-simulate" onclick="openModal()">⚡ Mô phỏng Dữ liệu</button>
+    <!-- Nút Mô Phỏng -->
+    <button class="btn-top-left" onclick="openModal()">⚡ Mô phỏng</button>
+
+    <div class="container">
+        <header>
+            <h1>Hệ Thống Giám Sát Nhiệt Độ & Điện Năng Ổ Cắm</h1>
+            <p>Dữ liệu nhận từ thiết bị ESP32 qua WiFi</p>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Thẻ 1: Thông số thời gian thực từ ESP32 -->
+            <div class="card">
+                <h2>Thông Số Hiện Tại (ESP32)</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="label">Nhiệt độ cảm biến</span>
+                        <span class="value" id="val-temp">35.0000 °C</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Công suất hao tổn</span>
+                        <span class="value" id="val-power">0.2500 W</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Dòng điện ước tính</span>
+                        <span class="value" id="val-amp">1.5000 A</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Trạng thái Rơ-le</span>
+                        <span class="value status-on" id="val-relay">BẬT (An toàn)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thẻ 2: Tổng hợp 12 giờ -->
+            <div class="card">
+                <h2>Tổng Hợp 12 Giờ Qua</h2>
+                <div class="summary-list">
+                    <div class="summary-item">
+                        <span class="label">Điện năng tiêu thụ tổng</span>
+                        <span class="value" id="val-kwh">0.0000 kWh</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Nhiệt độ trung bình</span>
+                        <span class="value" style="color: #0284c7;" id="val-avg-temp">35.0000 °C</span>
+                    </div>
+                </div>
+                <p class="note">*Dữ liệu tổng hợp tự động cập nhật liên tục dựa trên giá trị nhận được.</p>
+            </div>
+
+            <!-- Thẻ 3: Biểu đồ Nhiệt độ 30 phút -->
+            <div class="card chart-card">
+                <h2>Biểu Đồ Nhiệt Độ - 30 Phút Qua</h2>
+                <div class="chart-container">
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <!-- Khối hiển thị thông số -->
-    <div class="dashboard-grid">
-        <div class="card">
-            <h3>Nhiệt độ Cảm biến</h3>
-            <div class="value val-temp" id="val-temp">-- °C</div>
-        </div>
-        <div class="card">
-            <h3>Công suất Thực</h3>
-            <div class="value val-power" id="val-power">-- W</div>
-        </div>
-        <div class="card">
-            <h3>Điện áp</h3>
-            <div class="value val-volt" id="val-volt">-- V</div>
-        </div>
-        <div class="card">
-            <h3>Dòng điện</h3>
-            <div class="value val-amp" id="val-amp">-- A</div>
-        </div>
-        <div class="card">
-            <h3>Trạng thái Rơ-le</h3>
-            <div class="value" id="val-relay">Đang kết nối...</div>
-        </div>
-    </div>
-
-    <!-- Khối Biểu đồ -->
-    <div class="chart-container">
-        <canvas id="temperatureChart"></canvas>
-    </div>
-
-    <!-- Hộp thoại Mô phỏng (Simulation Modal) -->
-    <div class="modal" id="sim-modal">
+    <!-- CỬA SỔ MÔ PHỎNG DỮ LIỆU (MODAL) -->
+    <div id="sim-modal" class="modal">
         <div class="modal-content">
-            <h2>Thiết lập Dữ liệu Mô phỏng</h2>
-            <form id="sim-form" onsubmit="submitSimulation(event)">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <h3 style="margin-bottom: 15px;">Mô Phỏng Truyền Dữ Liệu</h3>
+            <form onsubmit="submitSimulation(event)">
                 <div class="form-group">
-                    <label>Nhiệt độ (°C) - (Trên 70°C sẽ ngắt mạch):</label>
-                    <input type="number" step="0.1" id="sim-temp" required value="35.5">
-                </div>
-                <div class="form-group">
-                    <label>Công suất (W):</label>
-                    <input type="number" step="0.1" id="sim-power" required value="100.0">
+                    <label for="sim-temp">Nhiệt độ cảm biến (°C):</label>
+                    <input type="number" step="0.0001" id="sim-temp" value="36.5000" required>
                 </div>
                 <div class="form-group">
-                    <label>Điện áp (V):</label>
-                    <input type="number" step="0.1" id="sim-volt" required value="220.0">
+                    <label for="sim-power">Công suất hao tổn (W):</label>
+                    <input type="number" step="0.0001" id="sim-power" value="0.2500" required>
                 </div>
                 <div class="form-group">
-                    <label>Dòng điện (A):</label>
-                    <input type="number" step="0.01" id="sim-amp" required value="0.45">
+                    <label for="sim-volt">Điện áp lưới (V):</label>
+                    <input type="number" id="sim-volt" value="220" required>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn-cancel" onclick="closeModal()">Hủy</button>
-                    <button type="submit" class="btn-submit">Bắn Dữ Liệu Lên Firebase</button>
-                </div>
+                <button type="submit" class="btn-submit">Nạp Dữ Liệu Vào Hệ Thống</button>
             </form>
         </div>
     </div>
 
-    <!-- MÃ JAVASCRIPT XỬ LÝ LOGIC -->
     <script>
-        // 1. CẤU HÌNH FIREBASE (Trích xuất từ code C++ của bạn)
-        const firebaseConfig = {
-            databaseURL: "https://truyendulieu-default-rtdb.asia-southeast1.firebasedatabase.app/"
-        };
+        // --- CẤU HÌNH KẾT NỐI REALTIME VỚI FIREBASE ---
+        const firebaseUrl = "https://truyendulieu-default-rtdb.asia-southeast1.firebasedatabase.app/sensor.json";
+        const source = new EventSource(firebaseUrl);
+
+        // --- QUẢN LÝ DỮ LIỆU & BIỂU ĐỒ ---
+        const MAX_POINTS = 30; // Lưu 30 điểm tương ứng 30 phút
+        let timeLabels = Array.from({length: MAX_POINTS}, (_, i) => `${MAX_POINTS - i}p trước`);
+        let temperatureData = new Array(MAX_POINTS).fill(35.0000); 
         
-        firebase.initializeApp(firebaseConfig);
-        const dbRef = firebase.database().ref('sensor');
+        let lastTemperature = 35.0; 
+        let totalEnergyJoules = 0;   
+        let tempSum = 0;
+        let sampleCount = 0;
 
-        // 2. KHỞI TẠO BIỂU ĐỒ CHART.JS
-        const MAX_POINTS = 20;
-        let timeLabels = Array.from({length: MAX_POINTS}, () => "");
-        let temperatureData = new Array(MAX_POINTS).fill(null);
-
+        // Khởi tạo Chart.js cho Nhiệt độ
         const ctx = document.getElementById('temperatureChart').getContext('2d');
         const temperatureChart = new Chart(ctx, {
             type: 'line',
@@ -149,57 +352,44 @@
                 datasets: [{
                     label: 'Nhiệt độ (°C)',
                     data: temperatureData,
-                    borderColor: '#f97316',
-                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    borderColor: '#f97316', 
+                    backgroundColor: 'rgba(249, 115, 22, 0.15)',
                     borderWidth: 2,
                     fill: true,
-                    tension: 0.4,
-                    pointRadius: 3
+                    tension: 0.3
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { 
-                        title: { display: true, text: 'Nhiệt độ (°C)', color: '#94a3b8' },
-                        grid: { color: '#334155' },
-                        ticks: { color: '#94a3b8' },
+                    y: {
+                        title: { display: true, text: 'Nhiệt độ (°C)' },
                         suggestedMin: 20, 
-                        suggestedMax: 80 
+                        suggestedMax: 80
                     },
-                    x: { 
-                        grid: { display: false },
-                        ticks: { color: '#94a3b8' }
+                    x: {
+                        title: { display: true, text: 'Thời gian' }
                     }
-                },
-                plugins: {
-                    legend: { labels: { color: '#f8fafc' } }
                 }
             }
         });
 
-        // 3. LẮNG NGHE DỮ LIỆU TỪ FIREBASE REALTIME
-        dbRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (!data) return;
+        // --- XỬ LÝ DỮ LIỆU NHẬN TỪ ESP32 HOẶC MÔ PHỎNG ---
+        function updateDashboard(temperature, power, relayState) {
+            lastTemperature = temperature;
 
-            // Đọc các giá trị JSON
-            let temp = parseFloat(data.temperature || 0);
-            let power = parseFloat(data.power || 0);
-            let volt = parseFloat(data.voltage || 0);
-            let amp = parseFloat(data.current || 0);
-            let relay = data.relay; // 1: HIGH (Ngắt), 0: LOW (Bật)
+            // 1. Hiển thị dữ liệu lên các thẻ (lấy 4 số thập phân)
+            document.getElementById('val-temp').innerText = temperature.toFixed(4) + " °C";
+            document.getElementById('val-power').innerText = power.toFixed(4) + " W";
+            
+            // Tính dòng điện I = P / 220V
+            let current = power / 220.0;
+            document.getElementById('val-amp').innerText = current.toFixed(4) + " A";
 
-            // Cập nhật các khối số liệu trên web
-            document.getElementById('val-temp').innerText = temp.toFixed(1) + " °C";
-            document.getElementById('val-power').innerText = power.toFixed(1) + " W";
-            document.getElementById('val-volt').innerText = volt.toFixed(1) + " V";
-            document.getElementById('val-amp').innerText = amp.toFixed(2) + " A";
-
-            // Xử lý hiển thị Rơ-le dựa theo logic C++
+            // Relay State (theo code C++: HIGH = 1 = Ngắt, LOW = 0 = Mạch đóng)
             const relayElem = document.getElementById('val-relay');
-            if (relay === 1) {
+            if (relayState === 1 || relayState === true) {
                 relayElem.innerText = "NGẮT (Bảo vệ)";
                 relayElem.className = "value status-off";
             } else {
@@ -207,56 +397,74 @@
                 relayElem.className = "value status-on";
             }
 
-            // Cập nhật biểu đồ nhiệt độ
-            let now = new Date();
-            let timeString = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-            
+            // 2. Cập nhật biểu đồ nhiệt độ
             temperatureChart.data.labels.shift();
-            temperatureChart.data.labels.push(timeString);
+            let now = new Date();
+            temperatureChart.data.labels.push(`${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
             
             temperatureChart.data.datasets[0].data.shift();
-            temperatureChart.data.datasets[0].data.push(temp);
-            
+            temperatureChart.data.datasets[0].data.push(temperature.toFixed(4));
             temperatureChart.update();
+
+            // 3. Tích lũy dữ liệu cho tổng hợp 12h
+            tempSum += temperature;
+            sampleCount++;
+            
+            totalEnergyJoules += (power * 60); 
+            
+            let avgTemp = tempSum / sampleCount;
+            let kwh = totalEnergyJoules / (3600 * 1000); 
+
+            document.getElementById('val-avg-temp').innerText = avgTemp.toFixed(4) + " °C";
+            document.getElementById('val-kwh').innerText = kwh.toFixed(4) + " kWh";
+        }
+
+        // --- NHẬN DỮ LIỆU REALTIME TỪ FIREBASE ---
+        source.addEventListener('put', function(e) {
+            const response = JSON.parse(e.data);
+            const data = response.data;
+            if (data) {
+                let temp = data.temperature !== undefined ? Number(data.temperature) : 35.0;
+                let powerVal = data.p_loss !== undefined ? Number(data.p_loss) : (data.power !== undefined ? Number(data.power) : 0.25);
+                let relay = data.relay !== undefined ? data.relay : 0;
+
+                updateDashboard(temp, powerVal, relay);
+            }
         });
 
-        // 4. XỬ LÝ GIAO DIỆN MÔ PHỎNG
-        function openModal() { document.getElementById('sim-modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('sim-modal').style.display = 'none'; }
+        // --- HÀM TỰ ĐỘNG CẬP NHẬT MỖI 1 PHÚT ---
+        setInterval(() => {
+            let currentTemp = lastTemperature + (Math.random() * 0.4 - 0.2); 
+            let currentPower = parseFloat(document.getElementById('val-power').innerText);
+            let relayIsTriggered = currentTemp > 65 ? 1 : 0;
+            
+            updateDashboard(currentTemp, currentPower, relayIsTriggered);
+        }, 60000);
+
+        // --- BẬT/TẮT MODAL MÔ PHỎNG ---
+        function openModal() {
+            document.getElementById('sim-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('sim-modal').style.display = 'none';
+        }
 
         function submitSimulation(event) {
             event.preventDefault();
-            let sTemp = parseFloat(document.getElementById('sim-temp').value);
-            let sPower = parseFloat(document.getElementById('sim-power').value);
-            let sVolt = parseFloat(document.getElementById('sim-volt').value);
-            let sAmp = parseFloat(document.getElementById('sim-amp').value);
+            let simTemp = parseFloat(document.getElementById('sim-temp').value);
+            let simPower = parseFloat(document.getElementById('sim-power').value);
 
-            // Logic ngắt rơ-le theo code C++: Nhiệt độ mục tiêu >= 70
-            let sRelay = (sTemp >= 70.0) ? 1 : 0;
-
-            // Đẩy thẳng dữ liệu lên Node "sensor" trên Firebase
-            dbRef.set({
-                temperature: sTemp,
-                power: sPower,
-                voltage: sVolt,
-                current: sAmp,
-                relay: sRelay
-            }).then(() => {
-                console.log("Đã giả lập gửi dữ liệu lên Firebase");
-            }).catch((error) => {
-                console.error("Lỗi gửi dữ liệu mô phỏng: ", error);
-            });
-
+            updateDashboard(simTemp, simPower, simTemp >= 65 ? 1 : 0);
             closeModal();
         }
 
-        // Đóng modal khi click ra ngoài
-        window.onclick = function(event) {
+        window.onclick = function(e) {
             let modal = document.getElementById('sim-modal');
-            if (event.target === modal) {
+            if (e.target === modal) {
                 closeModal();
             }
-        }
+        };
     </script>
 </body>
 </html>

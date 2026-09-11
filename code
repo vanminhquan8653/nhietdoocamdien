@@ -265,12 +265,12 @@
                         <span class="value" id="val-temp">35.0 °C</span>
                     </div>
                     <div class="stat-item">
-                        <span class="label">Công suất thực</span>
-                        <span class="value" id="val-power">330 W</span>
+                        <span class="label">Công suất hao tổn (P_loss)</span>
+                        <span class="value" id="val-power" style="color: #e67e22;">0.25 W</span>
                     </div>
                     <div class="stat-item">
                         <span class="label">Dòng điện ước tính</span>
-                        <span class="value" id="val-amp">1.50 A</span>
+                        <span class="value" id="val-amp">2.24 A</span>
                     </div>
                     <div class="stat-item">
                         <span class="label">Trạng thái Rơ-le</span>
@@ -284,8 +284,8 @@
                 <h2>Tổng Hợp 12 Giờ Qua</h2>
                 <div class="summary-list">
                     <div class="summary-item">
-                        <span class="label">Điện năng tiêu thụ tổng</span>
-                        <span class="value" id="val-kwh">0.000 kWh</span>
+                        <span class="label">Năng lượng hao tổn tích lũy</span>
+                        <span class="value" id="val-kwh">0.0000 kWh</span>
                     </div>
                     <div class="summary-item">
                         <span class="label">Nhiệt độ trung bình</span>
@@ -316,8 +316,8 @@
                     <input type="number" step="0.1" id="sim-temp" value="36.5" required>
                 </div>
                 <div class="form-group">
-                    <label for="sim-power">Công suất tiêu thụ (W):</label>
-                    <input type="number" step="0.1" id="sim-power" value="450" required>
+                    <label for="sim-power">Công suất hao tổn P_loss (W):</label>
+                    <input type="number" step="0.01" id="sim-power" value="0.25" required>
                 </div>
                 <div class="form-group">
                     <label for="sim-volt">Điện áp lưới (V):</label>
@@ -329,13 +329,17 @@
     </div>
 
     <script>
+        // --- CẤU HÌNH KẾT NỐI REALTIME VỚI FIREBASE ---
+        const firebaseUrl = "https://truyendulieu-default-rtdb.asia-southeast1.firebasedatabase.app/sensor.json";
+        const source = new EventSource(firebaseUrl);
+
         // --- QUẢN LÝ DỮ LIỆU & BIỂU ĐỒ ---
         const MAX_POINTS = 30; // Lưu 30 điểm tương ứng 30 phút
         let timeLabels = Array.from({length: MAX_POINTS}, (_, i) => `${MAX_POINTS - i}p trước`);
-        let temperatureData = new Array(MAX_POINTS).fill(35.0); // Khởi tạo mảng nhiệt độ với giá trị 35.0
+        let temperatureData = new Array(MAX_POINTS).fill(35.0); 
         
         let lastTemperature = 35.0; 
-        let totalEnergyJoules = 0;   // Tích lũy năng lượng tính kWh
+        let totalLossEnergyJoules = 0;   // Tích lũy năng lượng hao tổn (Joule)
         let tempSum = 0;
         let sampleCount = 0;
 
@@ -361,7 +365,7 @@
                 scales: {
                     y: {
                         title: { display: true, text: 'Nhiệt độ (°C)' },
-                        suggestedMin: 20, // Khoảng giá trị gợi ý trục Y
+                        suggestedMin: 20,
                         suggestedMax: 80
                     },
                     x: {
@@ -372,18 +376,18 @@
         });
 
         // --- XỬ LÝ DỮ LIỆU NHẬN TỪ ESP32 HOẶC MÔ PHỎNG ---
-        function updateDashboard(temperature, power, relayState) {
+        function updateDashboard(temperature, pLoss, relayState, currentInput) {
             lastTemperature = temperature;
 
-            // 1. Hiển thị dữ liệu lên các thẻ
+            // 1. Hiển thị dữ liệu Công suất hao tổn (P_loss)
             document.getElementById('val-temp').innerText = temperature.toFixed(1) + " °C";
-            document.getElementById('val-power').innerText = power.toFixed(1) + " W";
+            document.getElementById('val-power').innerText = pLoss.toFixed(3) + " W";
             
-            // Tính dòng điện I = P / 220V
-            let current = power / 220.0;
+            // Tính toán dòng điện ước tính từ P_loss = I^2 * R_contact (với R_contact = 0.05 Ohm)
+            let current = currentInput !== undefined ? currentInput : Math.sqrt(pLoss / 0.05);
             document.getElementById('val-amp').innerText = current.toFixed(2) + " A";
 
-            // Relay State (theo code C++: HIGH = 1 = Ngắt, LOW = 0 = Mạch đóng)
+            // Trạng thái Rơ-le (1: Ngắt/Cảnh báo, 0: Bật/An toàn)
             const relayElem = document.getElementById('val-relay');
             if (relayState === 1 || relayState === true) {
                 relayElem.innerText = "NGẮT (Bảo vệ)";
@@ -399,34 +403,46 @@
             temperatureChart.data.labels.push(`${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
             
             temperatureChart.data.datasets[0].data.shift();
-            temperatureChart.data.datasets[0].data.push(temperature.toFixed(1)); // Đẩy trực tiếp giá trị nhiệt độ
+            temperatureChart.data.datasets[0].data.push(temperature.toFixed(1));
             temperatureChart.update();
 
-            // 3. Tích lũy dữ liệu cho tổng hợp 12h
+            // 3. Tích lũy dữ liệu tổng hợp
             tempSum += temperature;
             sampleCount++;
             
-            // Công suất (W) * 60 giây = Năng lượng (Joule)
-            totalEnergyJoules += (power * 60); 
+            // Công suất hao tổn (W) * 60 giây = Năng lượng hao tổn (Joule)
+            totalLossEnergyJoules += (pLoss * 60); 
             
             // Cập nhật thẻ tổng hợp
             let avgTemp = tempSum / sampleCount;
-            let kwh = totalEnergyJoules / (3600 * 1000); // Chuyển Joules sang kWh
+            let lossKwh = totalLossEnergyJoules / (3600 * 1000); // Chuyển Joules sang kWh
 
             document.getElementById('val-avg-temp').innerText = avgTemp.toFixed(1) + " °C";
-            document.getElementById('val-kwh').innerText = kwh.toFixed(3) + " kWh";
+            document.getElementById('val-kwh').innerText = lossKwh.toFixed(4) + " kWh";
         }
 
-        // --- HÀM TỰ ĐỘNG CẬP NHẬT MỖI 1 PHÚT (60000ms) ---
+        // --- NHẬN DỮ LIỆU REALTIME TỪ FIREBASE ---
+        source.addEventListener('put', function(e) {
+            const response = JSON.parse(e.data);
+            const data = response.data;
+            if (data) {
+                let temp = data.temperature !== undefined ? Number(data.temperature) : 35.0;
+                // Nhận biến p_loss từ Firebase (hoặc biến power nếu truyền dạng hao tổn)
+                let pLoss = data.p_loss !== undefined ? Number(data.p_loss) : (data.power !== undefined ? Number(data.power) : 0.25);
+                let relay = data.relay !== undefined ? data.relay : 0;
+                let current = data.current !== undefined ? Number(data.current) : undefined;
+
+                updateDashboard(temp, pLoss, relay, current);
+            }
+        });
+
+        // --- HÀM TỰ ĐỘNG CẬP NHẬT MỖI 1 PHÚT (Giả lập chạy nền) ---
         setInterval(() => {
-            // Tự động tạo dao động nhẹ cho nhiệt độ nếu không có thao tác (để biểu đồ di chuyển)
             let currentTemp = lastTemperature + (Math.random() * 0.4 - 0.2); 
-            let currentPower = parseFloat(document.getElementById('val-power').innerText);
-            
-            // Nếu nhiệt độ > 65 thì giả lập kích hoạt Relay (1)
+            let currentPLoss = parseFloat(document.getElementById('val-power').innerText);
             let relayIsTriggered = currentTemp > 65 ? 1 : 0;
             
-            updateDashboard(currentTemp, currentPower, relayIsTriggered);
+            updateDashboard(currentTemp, currentPLoss, relayIsTriggered);
         }, 60000);
 
         // --- BẬT/TẮT MODAL MÔ PHỎNG ---
@@ -441,15 +457,15 @@
         function submitSimulation(event) {
             event.preventDefault();
             let simTemp = parseFloat(document.getElementById('sim-temp').value);
-            let simPower = parseFloat(document.getElementById('sim-power').value);
+            let simPLoss = parseFloat(document.getElementById('sim-power').value);
 
             // Cập nhật hệ thống bằng dữ liệu mô phỏng
-            updateDashboard(simTemp, simPower, simTemp >= 65 ? 1 : 0);
+            updateDashboard(simTemp, simPLoss, simTemp >= 65 ? 1 : 0);
             
             closeModal();
         }
 
-        // Đóng modal khi bấm ra ngoài vùng nội dung
+        // Đóng modal khi bấm ra ngoài
         window.onclick = function(e) {
             let modal = document.getElementById('sim-modal');
             if (e.target === modal) {
